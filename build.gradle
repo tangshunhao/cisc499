@@ -1,0 +1,98 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'antlr'
+    id 'com.adarshr.test-logger' version '2.1.0'
+}
+
+libsDirName = "../"
+
+repositories {
+    mavenCentral()
+}
+
+ext.junitJupiterVersion = '5.9.1'
+ext.jqwikVersion = '1.7.2'
+
+compileTestJava {
+    // To enable argument names in reporting and debugging
+    options.compilerArgs += '-parameters'
+}
+
+test {
+    useJUnitPlatform {
+        includeEngines 'jqwik'
+
+        // Or include several Junit engines if you use them
+        // includeEngines 'jqwik', 'junit-jupiter', 'junit-vintage'
+
+        // includeTags 'fast', 'medium'
+        // excludeTags 'slow'
+    }
+
+    include '**/*Properties.class'
+    include '**/*Test.class'
+    include '**/*Tests.class'
+}
+
+
+dependencies {
+    implementation 'info.picocli:picocli:4.1.4'
+    implementation "org.antlr:antlr4-runtime:4.8"
+    antlr 'org.antlr:antlr4:4.8'
+
+    implementation group: 'org.jgrapht', name: 'jgrapht-core', version: '1.4.0'
+    implementation group: 'org.jgrapht', name: 'jgrapht-ext', version: '1.4.0'
+    implementation group: 'jgraph', name: 'jgraph', version: '5.13.0.0'
+
+    testImplementation 'junit:junit:4.12'
+
+    // aggregate jqwik dependency
+    testImplementation "net.jqwik:jqwik:${jqwikVersion}"
+
+    // Add if you also want to use the Jupiter engine or Assertions from it
+    testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
+
+    // Add any other test library you need...
+    testImplementation "org.assertj:assertj-core:3.23.1"
+
+    // Optional but recommended to get annotation related API warnings
+    compileOnly("org.jetbrains:annotations:23.0.0")
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class' : 'Main'
+    }
+    baseName 'eval'
+    from configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+}
+
+generateGrammarSource {
+    arguments = ['-visitor', '-package', 'ql']
+    outputDirectory = file("${project.buildDir}/generated-src/main/java/ql/")
+}
+
+generateGrammarSource.doLast {
+    copy {
+        from "${project.buildDir}/generated-src/main/java/"
+        into "src/generated/java"
+    }
+}
+
+compileJava.dependsOn generateGrammarSource
+compileJava {
+    source = ['build/generated-src/main/java', 'src/main/java']
+}
+
+task removeGeneratedSource(type: Delete) {
+    delete 'src/generated/'
+}
+clean.dependsOn removeGeneratedSource
+
+sourceSets.main.java.srcDirs += file("src/generated/java")
+idea {
+    module {
+        generatedSourceDirs += file('src/generated/java')
+    }
+}
