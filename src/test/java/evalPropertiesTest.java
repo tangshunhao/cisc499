@@ -55,7 +55,7 @@ public class evalPropertiesTest {
         eval = new Eval(salesArray);
     }
 
-    // ==================================================================================================================
+    // ======================================= Num Expression ==========================================================
 
     // Property
     @Property
@@ -197,7 +197,7 @@ public class evalPropertiesTest {
         Assertions.assertThat(result).isEqualTo(salesArray.length);
     }
 
-    // set expression testing ---------------------------------------------
+    // ====================================  set expression testing ================================================
 
 
     @Provide
@@ -342,7 +342,7 @@ public class evalPropertiesTest {
         return Arbitraries.of("forall", "exists");
 
     }
-
+// ================================================== formula =========================================================
     // test formula
     @Property
     public void testFormula(@ForAll("forallOrExist") String f,@ForAll("com") String c,@ForAll @IntRange(min=MIN_SALES_VALUE,max=MAX_SALES_VALUE) Integer i) {
