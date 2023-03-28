@@ -16,50 +16,46 @@ import ql.QLParser;
 import java.io.File;
 import java.io.IOException;
 import java.net.URLDecoder;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 import ast.NExp;
 import net.jqwik.api.*;
 import org.assertj.core.api.Assertions;
-import java.util.Arrays;
-
 
 
 public class evalPropertiesTest {
     static int[][] salesArray;
+    Eval eval;
+
+    private static final int MIN_DIMENSION = 5;
+    private static final int MAX_DIMENSION = 10;
+    private static final int MIN_SALES_VALUE = 0;
+    private static final int MAX_SALES_VALUE = 100;
+
+
+    public static int[][] generateRandomSalesArray() {
+        Random random = new Random();
+        int rows = MIN_DIMENSION + random.nextInt(MAX_DIMENSION - MIN_DIMENSION + 1);
+        int cols = MIN_DIMENSION + random.nextInt(MAX_DIMENSION - MIN_DIMENSION + 1);
+
+        int[][] salesArray = new int[rows][cols];
+
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                salesArray[i][j] = MIN_SALES_VALUE + random.nextInt(MAX_SALES_VALUE - MIN_SALES_VALUE + 1);
+            }
+        }
+
+        return salesArray;
+    }
 
     @BeforeProperty
-    public void readData() throws IOException {
-        File file = new File(
-                URLDecoder.decode(Objects.requireNonNull(TestEval.class.getClassLoader()
-                        .getResource("salesArray.csv")).getFile(), StandardCharsets.UTF_8)
-        );
-        salesArray = CSVReader.read(file);
+    void setUp() {
+        salesArray = generateRandomSalesArray();
+        eval = new Eval(salesArray);
     }
 
-
-    //check testArray
-    @Provide
-    public static Arbitrary<int[][]> testArray() {
-        Arbitrary<int[]> row =  Arbitraries.integers().array(int[].class).ofSize(4);
-        Arbitrary<int[][]> matrix = row.array(int[][].class).ofMinSize(1).ofMaxSize(10);
-        return matrix;
-    }
-
-    // Check the property of salesAt function
-    @Property
-    @Report(Reporting.GENERATED)
-    void propTestArray(@ForAll("testArray") int[][] testArray) throws IOException {
-
-        int result = new Eval(testArray).eval(
-                (NExp) parse("2")
-        );
-        Assertions.assertThat(result).isEqualTo(2);
-    }
-
-
+    // ==================================================================================================================
 
     // Property
     @Property
@@ -74,7 +70,7 @@ public class evalPropertiesTest {
     // Property Nat
     @Property
     @Report(Reporting.GENERATED)
-    void propNat(@ForAll @IntRange(min=1,max=10) Integer n){
+    void propNat(@ForAll @IntRange(min=1,max=MIN_DIMENSION) Integer n){
         int result = new Eval(salesArray).eval(
                 (NExp) parse(Integer.toString(n))
         );
@@ -84,7 +80,6 @@ public class evalPropertiesTest {
     // Check the property of salesForM function
     @Example
     void propSalesForM() throws IOException {
-        readData();
         int result = new Eval(salesArray).eval(
                 (NExp) parse("salesForM(M)")
         );
@@ -95,14 +90,12 @@ public class evalPropertiesTest {
             }
         }
         Assertions.assertThat(result).isEqualTo(totalS);
-
     }
 
     // Check the property of salesAt function
     @Property
     @Report(Reporting.GENERATED)
-    void propSalesAt(@ForAll @IntRange(min=1,max=4) Integer p, @ForAll @IntRange(min=1,max=5) Integer d) throws IOException {
-        // readData();
+    void propSalesAt(@ForAll @IntRange(min=1,max=MIN_DIMENSION) Integer p, @ForAll @IntRange(min=1,max=MIN_DIMENSION) Integer d) throws IOException {
         int result = new Eval(salesArray).eval(
                 (NExp) parse("M[" + Integer.toString(p)+","+Integer.toString(d)+"]")
         );
@@ -112,7 +105,7 @@ public class evalPropertiesTest {
     // Check the property of salesForP function
     @Property
     @Report(Reporting.GENERATED)
-    void propSalesP(@ForAll @IntRange(min=1,max=4) Integer p) throws IOException {
+    void propSalesP(@ForAll @IntRange(min=1,max=MIN_DIMENSION) Integer p) throws IOException {
         // readData();
         int result = new Eval(salesArray).eval(
                 (NExp) parse("salesForP(M," + p + ")")
@@ -128,7 +121,7 @@ public class evalPropertiesTest {
     // Check the property of salesForD function
     @Property
     @Report(Reporting.GENERATED)
-    void propSalesD(@ForAll @IntRange(min=1,max=5) Integer d) throws IOException {
+    void propSalesD(@ForAll @IntRange(min=1,max=MIN_DIMENSION) Integer d) throws IOException {
         // readData();
         int result = new Eval(salesArray).eval(
                 (NExp) parse("salesForD(M," + d + ")")
@@ -188,7 +181,6 @@ public class evalPropertiesTest {
     // test function size for day
     @Example
     void testSizeD() throws IOException {
-        // readData();
         int result = new Eval(salesArray).eval(
                 (NExp) parse("size(Day)")
         );
@@ -253,7 +245,7 @@ public class evalPropertiesTest {
 
     // test set comprehension
     @Property
-    void testSetComprehension(@ForAll("fixedS") String str,@ForAll("com") String c,@ForAll @IntRange(min=1,max=4) Integer i){
+    void testSetComprehension(@ForAll("fixedS") String str,@ForAll("com") String c,@ForAll @IntRange(min=1,max=MIN_DIMENSION) Integer i){
         String s = "";
         if (str=="Day"){
             s = "d";
@@ -353,7 +345,7 @@ public class evalPropertiesTest {
 
     // test formula
     @Property
-    public void testFormula(@ForAll("forallOrExist") String f,@ForAll("com") String c,@ForAll @IntRange(min=1,max=4) Integer i) {
+    public void testFormula(@ForAll("forallOrExist") String f,@ForAll("com") String c,@ForAll @IntRange(min=MIN_SALES_VALUE,max=MAX_SALES_VALUE) Integer i) {
 
         // "exists p : Prod . exists d : Day . M[p,d] == 6"
         String input = f + " p : Prod . " + f + " d : Day . M[p,d] " + c + " " + i;
@@ -410,7 +402,153 @@ public class evalPropertiesTest {
         }
     }
 
+    @Property
+    void testCommutativityAddition(@ForAll @IntRange(min = MIN_SALES_VALUE, max = MAX_SALES_VALUE) Integer a,
+                                   @ForAll @IntRange(min = MIN_SALES_VALUE, max = MAX_SALES_VALUE) Integer b) {
+        boolean result = new Eval(salesArray).eval(
+                (Formula) parse(a + " + " + b + " == " + b + " + " + a)
+        );
+        Assertions.assertThat(result).isTrue();
+    }
 
+    @Property
+    void testCommutativityMultiplication(@ForAll @IntRange(min = MIN_SALES_VALUE, max = MAX_SALES_VALUE) Integer a,
+                                         @ForAll @IntRange(min = MIN_SALES_VALUE, max = MAX_SALES_VALUE) Integer b) {
+        boolean result = new Eval(salesArray).eval(
+                (Formula) parse(a + " * " + b + " == " + b + " * " + a)
+        );
+        Assertions.assertThat(result).isTrue();
+    }
+
+    // Test if the total sales of all products on a specific day are equal to the sum of sales for each product on that day
+    @Property
+    void testTotalSalesPerDay(@ForAll @IntRange(min = 1, max = MIN_DIMENSION) int day) {
+        Eval eval = new Eval(salesArray);
+        int totalSalesPerDay = eval.evalNExp(new SalesForD(new Nat(day)), new Env());
+        int sumOfSalesPerProduct = 0;
+
+        for (int product = 1; product <= salesArray.length; product++) {
+            sumOfSalesPerProduct += eval.evalNExp(new SalesAt(new Nat(product), new Nat(day)), new Env());
+        }
+
+        Assertions.assertThat(totalSalesPerDay).isEqualTo(sumOfSalesPerProduct);
+    }
+
+    // Test if the total sales of a specific product over all days are equal to the sum of sales for that product on each day
+    @Property
+    void testTotalSalesPerProduct(@ForAll @IntRange(min = 1, max = MIN_DIMENSION) int product) {
+        Eval eval = new Eval(salesArray);
+        int totalSalesPerProduct = eval.evalNExp(new SalesForP(new Nat(product)), new Env());
+        int sumOfSalesPerDay = 0;
+
+        for (int day = 1; day <= salesArray[0].length; day++) {
+            sumOfSalesPerDay += eval.evalNExp(new SalesAt(new Nat(product), new Nat(day)), new Env());
+        }
+
+        Assertions.assertThat(totalSalesPerProduct).isEqualTo(sumOfSalesPerDay);
+    }
+
+    // Test if the total sales for all products and days match the sum of sales for each product on each day
+    @Test
+    void testTotalSales() {
+        Eval eval = new Eval(salesArray);
+        int totalSales = eval.evalNExp(new SalesForM(), new Env());
+        int sumOfSales = 0;
+
+        for (int product = 1; product <= salesArray.length; product++) {
+            for (int day = 1; day <= salesArray[0].length; day++) {
+                sumOfSales += eval.evalNExp(new SalesAt(new Nat(product), new Nat(day)), new Env());
+            }
+        }
+
+        Assertions.assertThat(totalSales).isEqualTo(sumOfSales);
+    }
+
+    // Test if the total sales of each product are less than or equal to the total sales for all products
+    @Property
+    void totalSalesPerProductLessThanOrEqualToTotalSales() {
+        int totalSales = eval.evalNExp(new SalesForM(), new Env());
+        for (int product = 1; product <= salesArray.length; product++) {
+            int productSales = eval.evalNExp(new SalesForP(new Nat(product)), new Env());
+            Assertions.assertThat(productSales).isLessThanOrEqualTo(totalSales);
+        }
+    }
+
+    // Test if the total sales of each day are less than or equal to the total sales for all products
+    @Property
+    void totalSalesPerDayLessThanOrEqualToTotalSales() {
+        int totalSales = eval.evalNExp(new SalesForM(), new Env());
+        for (int day = 1; day <= salesArray[0].length; day++) {
+            int daySales = eval.evalNExp(new SalesForD(new Nat(day)), new Env());
+            Assertions.assertThat(daySales).isLessThanOrEqualTo(totalSales);
+        }
+    }
+
+
+    // Test if the total sales of each day are less than or equal to the total sales for all products
+    @Property
+    void totalSalesEqualToSumOfSalesPerDay() {
+        int totalSales = eval.evalNExp(new SalesForM(), new Env());
+        int sumOfSalesPerDay = 0;
+        for (int day = 1; day <= salesArray[0].length; day++) {
+            sumOfSalesPerDay += eval.evalNExp(new SalesForD(new Nat(day)), new Env());
+        }
+        Assertions.assertThat(totalSales).isEqualTo(sumOfSalesPerDay);
+    }
+
+    // Test if the total sales for all products are equal to the sum of the total sales per product:
+    @Property
+    void totalSalesEqualToSumOfSalesPerProduct() {
+        int totalSales = eval.evalNExp(new SalesForM(), new Env());
+        int sumOfSalesPerProduct = 0;
+        for (int product = 1; product <= salesArray.length; product++) {
+            sumOfSalesPerProduct += eval.evalNExp(new SalesForP(new Nat(product)), new Env());
+        }
+        Assertions.assertThat(totalSales).isEqualTo(sumOfSalesPerProduct);
+    }
+
+    @Property
+    void testThresholdExistsForAllDays(@ForAll @IntRange(min = 1, max = 50) int threshold) {
+        int[][] salesArray = generateRandomSalesArray();
+        String input = "exists p : Prod . forall d : Day . M[p,d] > " + threshold;
+        Boolean result = new Eval(salesArray).eval((Formula) parse(input));
+
+        int numProducts = salesArray.length;
+        int numDays = salesArray[0].length;
+        Boolean expected = false;
+
+        for (int product = 0; product < numProducts; product++) {
+            for (int day = 0; day < numDays; day++) {
+                int salesOnDay = salesArray[product][day];
+                if (salesOnDay > threshold){
+                    expected = true;
+                }
+            }
+        }
+        Assertions.assertThat(expected).isEqualTo(result);
+    }
+
+    // Test if the average sales per day is between the minimum and maximum sales values
+    @Property
+    void testAverageSalesPerDay(@ForAll @IntRange(min = 1, max = MIN_DIMENSION) int day) {
+        Eval eval = new Eval(salesArray);
+        int totalSalesPerDay = eval.evalNExp(new SalesForD(new Nat(day)), new Env());
+        int numProducts = salesArray.length;
+
+        double averageSalesPerDay = (double) totalSalesPerDay / numProducts;
+
+        int minSalesPerDay = Integer.MAX_VALUE;
+        int maxSalesPerDay = Integer.MIN_VALUE;
+
+        for (int product = 1; product <= numProducts; product++) {
+            int sales = eval.evalNExp(new SalesAt(new Nat(product), new Nat(day)), new Env());
+            minSalesPerDay = Math.min(minSalesPerDay, sales);
+            maxSalesPerDay = Math.max(maxSalesPerDay, sales);
+        }
+
+        Assertions.assertThat(averageSalesPerDay).isGreaterThanOrEqualTo(minSalesPerDay);
+        Assertions.assertThat(averageSalesPerDay).isLessThanOrEqualTo(maxSalesPerDay);
+    }
 
     public ASTNode parse(String input) {
         QLLexer lexer = new QLLexer(CharStreams.fromString(input));
