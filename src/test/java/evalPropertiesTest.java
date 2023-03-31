@@ -288,9 +288,9 @@ public class evalPropertiesTest {
         );
 
         Set<Integer> expected = new HashSet<>();
-        for(int i=1; i<= 5; i++)
+        for(int i=1; i<= salesArray.length; i++)
             expected.add(i);
-        for(int i=1; i<= 4; i++)
+        for(int i=1; i<= salesArray[0].length; i++)
             expected.add(i);
         Assertions.assertThat(expected).isEqualTo(result);
     }
@@ -303,9 +303,9 @@ public class evalPropertiesTest {
         );
 
         Set<Integer> expected = new HashSet<>();
-        for(int i=1; i<= 5; i++)
+        for(int i=1; i<= salesArray.length; i++)
             expected.add(i);
-        for(int i=1; i<= 4; i++)
+        for(int i=1; i<= salesArray[0].length; i++)
             expected.remove(i);
         Assertions.assertThat(expected).isEqualTo(result);
     }
@@ -318,8 +318,9 @@ public class evalPropertiesTest {
         );
 
         Set<Integer> expected = new HashSet<>();
-        for(int i=1; i<= 4; i++)
-            expected.remove(i);
+        int temp = Math.min(salesArray[0].length,salesArray.length);
+        for(int i=1; i<= temp; i++)
+            expected.add(i);
         Assertions.assertThat(expected).isEqualTo(result);
     }
 
@@ -508,9 +509,9 @@ public class evalPropertiesTest {
     }
 
     @Property
-    void testThresholdExistsForAllDays(@ForAll @IntRange(min = 1, max = 50) int threshold) {
-        int[][] salesArray = generateRandomSalesArray();
-        String input = "exists p : Prod . forall d : Day . M[p,d] > " + threshold;
+    void testThresholdExistsForAllDays(@ForAll @IntRange(min = MIN_SALES_VALUE, max = MAX_SALES_VALUE) int threshold) {
+        //int[][] salesArray = generateRandomSalesArray();
+        String input = "exists p : Prod . exists d : Day . M[p,d] > " + threshold;
         Boolean result = new Eval(salesArray).eval((Formula) parse(input));
 
         int numProducts = salesArray.length;
@@ -549,6 +550,13 @@ public class evalPropertiesTest {
         Assertions.assertThat(averageSalesPerDay).isGreaterThanOrEqualTo(minSalesPerDay);
         Assertions.assertThat(averageSalesPerDay).isLessThanOrEqualTo(maxSalesPerDay);
     }
+
+    //========================================= Generator ==========================================
+
+
+    // not done yet
+
+
 
     public ASTNode parse(String input) {
         QLLexer lexer = new QLLexer(CharStreams.fromString(input));
