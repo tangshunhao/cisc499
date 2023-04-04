@@ -554,9 +554,145 @@ public class evalPropertiesTest {
     //========================================= Generator ==========================================
 
 
-    // not done yet
+    // not finished yet
+
+    @Property
+    void testNatGenerator(@ForAll("nat") Nat nat) {
+        int result = new Eval(salesArray).eval(
+                (NExp) parse(Integer.toString(nat.value))
+        );
+        String s = "" + result + "";
+        Assertions.assertThat(s).isEqualTo(Integer.toString(nat.value));
+    }
+
+    @Provide
+    Arbitrary<Nat> nat() {
+        return Arbitraries.integers().between(1, 10).map(Nat::new);
+    }
+
+    @Provide
+    Arbitrary<SalesAt> salesAts() {
+        return Combinators.combine(
+                Arbitraries.integers().between(1, salesArray.length).map(Nat::new),
+                Arbitraries.integers().between(1, salesArray[0].length).map(Nat::new)
+        ).as((product, day) -> new SalesAt(product, day));
+    }
+
+    @Property
+    @Report(Reporting.GENERATED)
+    void testSalesAtGenerator(@ForAll("salesAts") SalesAt salesAt) throws IOException {
+        int result = new Eval(salesArray).eval(salesAt);
+
+        int p = ((Nat) salesAt.product).value;
+        int d = ((Nat) salesAt.day).value;
+
+        Assertions.assertThat(result).isEqualTo(salesArray[p - 1][d - 1]);
+    }
 
 
+    @Provide
+    Arbitrary<Nat> dayNat() {
+        return Arbitraries.integers().between(MIN_DIMENSION, MAX_DIMENSION).map(Nat::new);
+    }
+
+    @Provide
+    Arbitrary<SalesForD> salesForDs() {
+        return dayNat().map(SalesForD::new);
+    }
+
+    @Property
+    @Report(Reporting.GENERATED)
+    void testSalesForDGenerator(@ForAll("salesForDs") SalesForD salesForD) throws IOException {
+        int result = new Eval(salesArray).eval(salesForD);
+
+        int d = ((Nat) salesForD.day).value;
+
+        int salesD = 0;
+        if (d - 1 >= 0 && d - 1 < salesArray[0].length) {
+            for (int p = 0; p < salesArray.length; p++) {
+                salesD += salesArray[p][d - 1];
+            }
+        }
+
+        Assertions.assertThat(result).isEqualTo(salesD);
+    }
+
+    @Provide
+    Arbitrary<Nat> productNat() {
+        return Arbitraries.integers().between(MIN_DIMENSION, MAX_DIMENSION).map(Nat::new);
+    }
+
+    @Provide
+    Arbitrary<SalesForP> salesForPs() {
+        return productNat().map(SalesForP::new);
+    }
+
+    @Property
+    @Report(Reporting.GENERATED)
+    void testSalesForPGenerator(@ForAll("salesForPs") SalesForP salesForP) throws IOException {
+        int result = new Eval(salesArray).eval(salesForP);
+
+        int p = ((Nat) salesForP.product).value;
+
+        int salesP = 0;
+        if (p - 1 >= 0 && p - 1 < salesArray.length) {
+            for (int d = 0; d < salesArray[p-1].length; d++) {
+                salesP += salesArray[p - 1][d];
+            }
+        }
+
+        Assertions.assertThat(result).isEqualTo(salesP);
+    }
+
+    @Provide
+    Arbitrary<BinaryNExp> binaryNExps() {
+        Arbitrary<BinNOp> binNOpArbitrary = Arbitraries.of(BinNOp.Kind.values()).map(BinNOp::new);
+        Arbitrary<Nat> natArbitrary = Arbitraries.integers().between(1, 100).map(Nat::new);
+
+        return Combinators.combine(
+                binNOpArbitrary,
+                natArbitrary,
+                natArbitrary
+        ).as(BinaryNExp::new);
+    }
+
+    @Property
+    @Report(Reporting.GENERATED)
+    void testBinaryNExpGenerator(@ForAll("binaryNExps") BinaryNExp binaryNExp) throws IOException {
+        BinNOp.Kind op = binaryNExp.op.kind;
+        int lhs = ((Nat) binaryNExp.lhs).value;
+        int rhs = ((Nat) binaryNExp.rhs).value;
+
+        try {
+            int expectedResult;
+            switch (op) {
+                case ADD:
+                    expectedResult = lhs + rhs;
+                    break;
+                case DIFF:
+                    expectedResult = lhs - rhs;
+                    break;
+                case MULT:
+                    expectedResult = lhs * rhs;
+                    break;
+                case DIV:
+                    if (rhs == 0) {
+                        // Skip the test if the divisor is zero, since dividing by zero is undefined.
+                        return;
+                    }
+                    expectedResult = lhs / rhs;
+                    break;
+                default:
+                    throw new IllegalStateException("Unexpected operator: " + op);
+            }
+
+            int result = new Eval(salesArray).eval(binaryNExp);
+            Assertions.assertThat(result).isEqualTo(expectedResult);
+        } catch (BaseEval.DivisionByZeroException e) {
+            // If a DivisionByZeroException is thrown, make sure rhs is 0.
+            Assertions.assertThat(rhs).isEqualTo(0);
+        }
+    }
 
     public ASTNode parse(String input) {
         QLLexer lexer = new QLLexer(CharStreams.fromString(input));
