@@ -694,6 +694,21 @@ public class evalPropertiesTest {
         }
     }
 
+    // BinarySExps genrator
+    @Provide
+    Arbitrary<BinarySExp> binarySExps(Arbitrary<SExp> sExpArbitrary) {
+        Arbitrary<BinSOp> binSOpArbitrary = Arbitraries.of(BinSOp.Kind.values()).map(BinSOp::new);
+
+        return Combinators.combine(
+                binSOpArbitrary,
+                sExpArbitrary,
+                sExpArbitrary
+        ).as(BinarySExp::new);
+    }
+
+
+
+
     public ASTNode parse(String input) {
         QLLexer lexer = new QLLexer(CharStreams.fromString(input));
         TokenStream tokens = new CommonTokenStream(lexer);
